@@ -2521,6 +2521,14 @@ class MainWindow(QMainWindow):
     # -- Results list ------------------------------------------------------
 
     def _refresh_list(self) -> None:
+        # Hide existing item widgets before clearing — QListWidget.clear() removes
+        # items but widgets set via setItemWidget() stay as viewport children.
+        # Making them invisible first prevents them from showing as ghost cards.
+        for i in range(self.list_widget.count()):
+            w = self.list_widget.itemWidget(self.list_widget.item(i))
+            if w:
+                w.hide()
+
         ordered = self._sort_for_display(self.listings)
 
         self.list_widget.clear()
@@ -2542,15 +2550,15 @@ class MainWindow(QMainWindow):
             self.cards.append(card)
             self._load_image(card)
 
-        for listing in self._hidden_listings:
-            card = ListingCard(listing, is_hidden=True)
-            item = QListWidgetItem()
-            item.setSizeHint(card.sizeHint())
-            item.setHidden(not self._show_hidden)
-            self.list_widget.addItem(item)
-            self.list_widget.setItemWidget(item, card)
-            self._hidden_items.append(item)
-            self._load_image(card)
+        if self._show_hidden:
+            for listing in self._hidden_listings:
+                card = ListingCard(listing, is_hidden=True)
+                item = QListWidgetItem()
+                item.setSizeHint(card.sizeHint())
+                self.list_widget.addItem(item)
+                self.list_widget.setItemWidget(item, card)
+                self._hidden_items.append(item)
+                self._load_image(card)
 
     def _update_count_label(self, visible_count: int | None = None) -> None:
         if visible_count is None:
@@ -2613,9 +2621,7 @@ class MainWindow(QMainWindow):
         self.toggle_hidden_button.setText(
             "Hide hidden ads" if self._show_hidden else "Show hidden ads"
         )
-        for item in self._hidden_items:
-            item.setHidden(not self._show_hidden)
-        self._update_count_label()
+        self._refresh_list()
 
     def _on_card_clicked(self, card: ListingCard, shift: bool) -> None:
         if shift and self._last_clicked_card is not None and self._last_clicked_card in self.cards:
